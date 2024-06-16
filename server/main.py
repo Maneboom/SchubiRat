@@ -37,16 +37,15 @@ def split_embed(embed, max_length=6000):
     fields = embed.fields
     split_embeds = []
 
-    # Create a new embed to start with
     current_embed = DiscordEmbed(title=embed.title, color=embed.color)
-    current_length = len(current_embed.to_dict())
+    current_length = len(embed.title or "") + len(embed.description or "")
 
     for field in fields:
         field_length = len(field['name']) + len(field['value'])
         if current_length + field_length > max_length:
             split_embeds.append(current_embed)
             current_embed = DiscordEmbed(title=embed.title, color=embed.color)
-            current_length = len(current_embed.to_dict())
+            current_length = len(embed.title or "") + len(embed.description or "")
 
         current_embed.add_embed_field(name=field['name'], value=field['value'], inline=field['inline'])
         current_length += field_length
